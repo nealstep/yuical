@@ -22,15 +22,31 @@ ROOT = 'http://ical.uit.yorku.ca/'
 
 from logging import basicConfig, DEBUG, debug
 from argparse import ArgumentParser
+from requests import get
+from re import findall
 
 class YUiCalException(Exception):
     pass
 
+DIR_TEMPLATE = "%s_%s_%s"
+REGEX = "%s_[^\.]+\.ics"
+REGEX_NUMBER = "%s_[^_]+_%s_[^\.]+\.ics"
 
 def search(args):
+    dirName = DIR_TEMPLATE % (args.year, args.faculty, args.subject)
+    r = get("%s/%s" % (ROOT, dirName))
+    if r.status_code != 200:
+        raise YUiCalException("Get failed, status code (%s)" % r.status_code)
+    if args.number:
+        regex = REGEX_NUMBER % (dirName, args.number)
+    else:
+        regex = REGEX % dirName
+    courses = findall(regex, r.text)
+    print "\n".join(courses)
     return
 
-def list(args):
+def display(code):
+    print code
     return
 
 
@@ -65,7 +81,7 @@ if __name__ == "__main__":
         else:
             search(args)
     if args.code:
-        display(args)
+        display(args.code)
 
                 
         
