@@ -24,6 +24,8 @@ from logging import basicConfig, DEBUG, debug
 from argparse import ArgumentParser
 from requests import get
 from re import findall
+from icalendar import Calendar
+
 
 class YUiCalException(Exception):
     pass
@@ -36,17 +38,46 @@ def search(args):
     dirName = DIR_TEMPLATE % (args.year, args.faculty, args.subject)
     r = get("%s/%s" % (ROOT, dirName))
     if r.status_code != 200:
-        raise YUiCalException("Get failed, status code (%s)" % r.status_code)
+        raise YUiCalException("Get directory failed, status code (%s)"
+                                  % r.status_code)
     if args.number:
         regex = REGEX_NUMBER % (dirName, args.number)
     else:
         regex = REGEX % dirName
     courses = findall(regex, r.text)
+    courses = [c[:-4] for c in courses]
     print "\n".join(courses)
     return
 
+
+def calculate_time(event):
+    start = event['DTSTART'].dt
+    end = event['DTEND'].dt
+    return end - start
+
 def display(code):
-    print code
+    dirName = code[:12]
+    print dirName, code
+    r = get("%s/%s/%s.ics" % (ROOT, dirName, code))
+    if r.status_code != 200:
+        raise YUiCalException("Get ical failed, status code (%s)"
+                                  % r.status_code)
+    ical = Calendar.from_ical(r.text)
+    for component in ical.walk('vevent'):
+        for item in component.sorted_items():
+            if item[0] in ('SUMMARY', 'LOCATION', 'UID'):
+                print '%s: %s' % (item[0], item[1])
+            if item[0] == 'RECURRENCE-ID':
+                reoccur_item = item[1]
+                print reoccur_item.params
+                print reoccur_item.dt
+                continue
+            if item[0] in ('DTSTART', 'DURATION', 'DTEND'):
+                print '%s: %s' % (item[0], item[1].dt)                
+                continue
+            if item[0] in ('RRULE'):
+                print '%s: %s' % (item[0], item[1])                
+                continue
     return
 
 
