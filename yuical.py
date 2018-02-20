@@ -25,6 +25,8 @@ from argparse import ArgumentParser
 from requests import get
 from re import findall
 from icalendar import Calendar
+from dateutil.rrule import rrule, WEEKLY
+from pytz import timezone
 
 
 class YUiCalException(Exception):
@@ -33,6 +35,9 @@ class YUiCalException(Exception):
 DIR_TEMPLATE = "%s_%s_%s"
 REGEX = "%s_[^\.]+\.ics"
 REGEX_NUMBER = "%s_[^_]+_%s_[^\.]+\.ics"
+DAYS = {'MO': 0, 'TU': 1, 'WE': 2, 'TH': 3, 'FR': 4, 'SA': 5, 'SU': 6}
+FREQS = {'WEEKLY': WEEKLY}
+
 
 def search(args):
     dirName = DIR_TEMPLATE % (args.year, args.faculty, args.subject)
@@ -48,7 +53,6 @@ def search(args):
     courses = [c[:-4] for c in courses]
     print "\n".join(courses)
     return
-
 
 def calculate_time(event):
     start = event['DTSTART'].dt
@@ -73,10 +77,19 @@ def display(code):
                 print reoccur_item.dt
                 continue
             if item[0] in ('DTSTART', 'DURATION', 'DTEND'):
+                if item[0] == 'DTSTART':
+                    start = item[1].dt
                 print '%s: %s' % (item[0], item[1].dt)                
                 continue
             if item[0] in ('RRULE'):
-                print '%s: %s' % (item[0], item[1])                
+                print '%s: %s' % (item[0], item[1])
+                bd = [DAYS[x] for x in item[1]['BYDAY']]
+                tz = timezone(start.tzname())
+                until = tz.localize(item[1]['UNTIL'][0])
+                rr = rrule(freq=FREQS[item[1]['FREQ'][0]], byweekday=bd,
+                               until = until,
+                               dtstart = start)
+                print list(rr)
                 continue
     return
 
